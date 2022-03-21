@@ -140,6 +140,25 @@ class Axis:
         return f'# {self.lowerBound:.9f} {self.width:.9f} {self.bins:d} {pbc}'
 
 
+def create_axis_from_dict(json_dict):
+    lb = json_dict['Lower bound']
+    ub = json_dict['Upper bound']
+    if 'Width' not in json_dict:
+        if 'Bins' not in json_dict:
+            bins = 0
+            raise RuntimeError('Cannot find "Width" or "Bins"')
+        else:
+            bins = json_dict['Bins']
+    else:
+        width = json_dict['Width']
+        bins = round(float(ub - lb) / width)
+    periodic = False
+    if 'Periodic' in json_dict:
+        periodic = json_dict['Periodic']
+    ax = Axis(lower_bound=lb, upper_bound=ub, bins=bins, periodic=periodic)
+    return ax
+
+
 class HistogramBase:
 
     def __init__(self, ax=None):
@@ -302,6 +321,17 @@ class HistogramScalar(HistogramBase):
         super().__init__(ax)
         self.data = np.zeros(self.get_histogram_size())
 
+    @staticmethod
+    def from_json_file(json_file):
+        import json
+        with open(json_file, 'r') as f_json:
+            all_data = f_json.read()
+            json_dict = json.loads(all_data)
+            ax_list = list()
+            for ax in json_dict['Axes']:
+                ax_list.append(create_axis_from_dict(ax))
+            return HistogramScalar(ax=ax_list)
+
     def __len__(self):
         return self.get_histogram_size()
 
@@ -327,9 +357,7 @@ class HistogramScalar(HistogramBase):
     def __getitem__(self, item):
         try:
             iter(item)
-            addr, check = self.address(item, True)
-            if all(check) is False:
-                raise IndexError('Position: {item} out of bound')
+            addr = self.address(item, True)
             return self.data[addr]
         except TypeError:
             return self.data[item]
@@ -369,9 +397,7 @@ class HistogramVector(HistogramBase):
     def __getitem__(self, item):
         try:
             iter(item)
-            addr, check = self.address(item, True)
-            if all(check) is False:
-                raise IndexError('Position: {item} out of bound')
+            addr = self.address(item, True)
             return self.data[addr:addr+self.get_multiplicity()]
         except TypeError:
             return self.data[item]
@@ -461,7 +487,14 @@ def test2():
     return hist
 
 
+def test_json():
+    hist = HistogramScalar.from_json_file('test_files/axis_encoded.json')
+    from sys import stdout
+    hist.write_to_stream(stdout)
+
+
 if __name__ == '__main__':
     # test1()
     # test2()
+    # test_json()
     pass
