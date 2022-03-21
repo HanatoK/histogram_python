@@ -354,13 +354,29 @@ class HistogramScalar(HistogramBase):
         self.logger.info(f'Expect {self.get_histogram_size()} lines, read {data_line} lines.')
         return True
 
-    def __getitem__(self, item):
+    def __getitem__(self, key):
         try:
-            iter(item)
-            addr = self.address(item, True)
-            return self.data[addr]
+            iter(key)
+            if self.is_in_grid(key):
+                addr = self.address(key, False)
+                return self.data[addr]
+            else:
+                raise IndexError(f'Index {key} is out of bound.')
         except TypeError:
-            return self.data[item]
+            return self.data[key]
+
+    def __setitem__(self, key, value):
+        try:
+            iter(key)
+            if self.is_in_grid(key):
+                addr = self.address(key, False)
+                self.data[addr] = value
+                return self.data[addr]
+            else:
+                raise IndexError(f'Index {key} is out of bound.')
+        except TypeError:
+            self.data[key] = value
+            return self.data[key]
 
     def get_data(self, copy=False):
         if copy is True:
@@ -369,7 +385,7 @@ class HistogramScalar(HistogramBase):
         else:
             return self.data
 
-    def write_to_stream(self, stream):
+    def write_to_stream(self, stream, pos_fmt='12.7f', data_fmt='15.7f'):
         write_ok = HistogramBase.write_to_stream(self, stream)
         if write_ok is False:
             return False
@@ -377,9 +393,9 @@ class HistogramScalar(HistogramBase):
         for i in range(0, self.get_histogram_size()):
             for j in range(0, self.get_dimension()):
                 pos[j] = self.pointTable[j][i]
-                stream.write(f' {pos[j]:12.7f}')
+                stream.write(f' {pos[j]:{pos_fmt}}')
             addr = self.address(pos, False)
-            stream.write(f' {self.data[addr]:15.10f}\n')
+            stream.write(f' {self.data[addr]:{data_fmt}}\n')
         return True
 
 
@@ -394,13 +410,28 @@ class HistogramVector(HistogramBase):
     def get_multiplicity(self):
         return self.multiplicity
 
-    def __getitem__(self, item):
+    def __getitem__(self, key):
         try:
-            iter(item)
-            addr = self.address(item, True)
-            return self.data[addr:addr+self.get_multiplicity()]
+            iter(key)
+            if self.is_in_grid(key):
+                addr = self.address(key, False)
+                return self.data[addr:addr+self.get_multiplicity()]
+            else:
+                raise IndexError(f'Index {key} is out of bound.')
         except TypeError:
-            return self.data[item]
+            return self.data[key]
+
+    def __setitem__(self, key, value):
+        try:
+            iter(key)
+            if self.is_in_grid(key):
+                addr = self.address(key, False)
+                for i in range(self.get_multiplicity()):
+                    self.data[addr+i] = value[i]
+            else:
+                raise IndexError(f'Index {key} is out of bound.')
+        except TypeError:
+            self.data[key] = value
 
     def get_data(self, copy=False):
         if copy is True:
@@ -409,7 +440,7 @@ class HistogramVector(HistogramBase):
         else:
             return self.data
 
-    def write_to_stream(self, stream):
+    def write_to_stream(self, stream, pos_fmt='12.7f', data_fmt='15.7f'):
         write_ok = HistogramBase.write_to_stream(self, stream)
         if write_ok is False:
             return False
@@ -417,10 +448,10 @@ class HistogramVector(HistogramBase):
         for i in range(0, self.get_histogram_size()):
             for j in range(0, self.get_dimension()):
                 pos[j] = self.pointTable[j][i]
-                stream.write(f' {pos[j]:12.7f}')
+                stream.write(f' {pos[j]:{pos_fmt}}')
             addr = self.address(pos, False)
             for j in range(0, self.get_multiplicity()):
-                stream.write(f' {self.data[addr+j]:15.10f}')
+                stream.write(f' {self.data[addr+j]:{data_fmt}}')
             stream.write('\n')
         return True
 
