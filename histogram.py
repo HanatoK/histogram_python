@@ -276,7 +276,7 @@ class HistogramBase:
         for val, ax, ac in zip(pos, self.axes, self.accu):
             i, c = ax.index(val, boundary_check)
             addr += ac * i
-            if c is False:
+            if c is False and boundary_check is True:
                 self.logger.warning(f'position {pos} is not in boundary!')
         return addr
 
@@ -312,6 +312,38 @@ class HistogramBase:
 
     def __len__(self):
         raise NotImplementedError()
+
+    # TODO: test functions for accessing neighboring addresses
+    def neighbor(self, pos, axis_index, previous=False):
+        import copy
+        bin_width_i = self.axes[axis_index].get_width()
+        pos_next = list(copy.deepcopy(pos))
+        if previous is True:
+            pos_next[axis_index] = pos_next[axis_index] - bin_width_i
+        else:
+            pos_next[axis_index] = pos_next[axis_index] + bin_width_i
+        in_boundary = self.is_in_grid(pos_next)
+        return self.address(pos_next, False), in_boundary
+
+    def neighbor_by_address(self, addr, axis_index, previous=False):
+        if addr >= self.histogramSize:
+            return 0, False
+        pos = self.reverse_address(addr)
+        return self.neighbor(pos, axis_index, previous)
+
+    def all_neighbor(self, pos):
+        results = list()
+        for i in range(self.ndim):
+            results.append(self.neighbor(pos, i, True))
+            results.append(self.neighbor(pos, i, False))
+        return results
+
+    def all_neighbor_by_address(self, addr):
+        results = list()
+        for i in range(self.ndim):
+            results.append(self.neighbor_by_address(addr, i, True))
+            results.append(self.neighbor_by_address(addr, i, False))
+        return results
 
 
 class HistogramScalar(HistogramBase):
@@ -484,47 +516,47 @@ class HistogramVector(HistogramBase):
         return len(self.data)
 
 
-def test1():
-    ax1 = Axis(-180.0, 180.0, 10, False)
-    ax2 = Axis(-180.0, 180.0, 10, False)
-    hist = HistogramScalar([ax1, ax2])
-
-    for x, y in zip(hist.pointTable[0], hist.pointTable[1]):
-        print(f'{x} {y}')
-
-    pos = (182, -90)
-    idx = hist.index(pos, True)
-    print(idx)
-    print(hist.address(pos))
-    print(hist.reverse_address(hist.address(pos)))
-    import sys
-    hist.write_to_stream(sys.stdout)
-
-
-def test2():
-    with open('qt_par_test_7.pmf', 'r') as f_test_pmf:
-        hist = HistogramScalar()
-        hist.read_from_stream(f_test_pmf)
-        with open('test_py.pmf', 'w') as f_out:
-            hist.write_to_stream(f_out)
-    import pandas as pd
-    import numpy as np
-    # compute error
-    origin = pd.read_csv('qt_par_test_7.pmf', delimiter=r'\s+', comment='#', header=None)
-    output = pd.read_csv('test_py.pmf', delimiter=r'\s+', comment='#', header=None)
-    diff = (origin[2] - output[2]).to_numpy()
-    total_error = np.sqrt(np.sum(diff * diff))
-    print(f'Total error = {total_error}')
-    return hist
-
-
-def test_json():
-    hist = HistogramScalar.from_json_file('test_files/axis_encoded.json')
-    from sys import stdout
-    hist.write_to_stream(stdout)
-
-
 if __name__ == '__main__':
+    def test1():
+        ax1 = Axis(-180.0, 180.0, 10, True)
+        ax2 = Axis(-180.0, 180.0, 10, True)
+        hist = HistogramScalar([ax1, ax2])
+
+        for x, y in zip(hist.pointTable[0], hist.pointTable[1]):
+            print(f'{x} {y}')
+
+        pos = (182, -90)
+        idx = hist.index(pos, True)
+        print(idx)
+        print(hist.address(pos))
+        print(hist.reverse_address(hist.address(pos)))
+        print(hist.all_neighbor(pos))
+        import sys
+        hist.write_to_stream(sys.stdout)
+
+
+    def test2():
+        with open('qt_par_test_7.pmf', 'r') as f_test_pmf:
+            hist = HistogramScalar()
+            hist.read_from_stream(f_test_pmf)
+            with open('test_py.pmf', 'w') as f_out:
+                hist.write_to_stream(f_out)
+        import pandas as pd
+        import numpy as np
+        # compute error
+        origin = pd.read_csv('qt_par_test_7.pmf', delimiter=r'\s+', comment='#', header=None)
+        output = pd.read_csv('test_py.pmf', delimiter=r'\s+', comment='#', header=None)
+        diff = (origin[2] - output[2]).to_numpy()
+        total_error = np.sqrt(np.sum(diff * diff))
+        print(f'Total error = {total_error}')
+        return hist
+
+
+    def test_json():
+        hist = HistogramScalar.from_json_file('test_files/axis_encoded.json')
+        from sys import stdout
+        hist.write_to_stream(stdout)
+
     # test1()
     # test2()
     # test_json()
