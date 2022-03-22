@@ -77,5 +77,5 @@ if __name__ == '__main__':
         with open(args.output, 'w') as f_output:
             # convert to PMF
             hist_pmf_target = convert_probability_to_pmf(hist_prob_target, args.kbt)
-            hist_pmf_target.write_to_stream(f_output)
+            hist_pmf_target.write_to_stream(f_output, data_fmt='15.10f')
             # TODO: test reweighting

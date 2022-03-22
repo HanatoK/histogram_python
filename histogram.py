@@ -139,6 +139,9 @@ class Axis:
             pbc = 1
         return f'# {self.lowerBound:.9f} {self.width:.9f} {self.bins:d} {pbc}'
 
+    def __str__(self) -> str:
+        s = f'boundary: [{self.lowerBound}, {self.upperBound}] ; width: {self.width} ; PBC: {self.periodic}'
+        return s
 
 def create_axis_from_dict(json_dict):
     lb = json_dict['Lower bound']
@@ -193,6 +196,15 @@ class HistogramBase:
                 self.accu[i] = self.accu[i - 1] * self.axes[i - 1].get_bin()
             self.histogramSize *= self.axes[i].get_bin()
         self.fill_table()
+        self.logger.info('\n'+str(self))
+
+    def __str__(self) -> str:
+        s = f'histogram size: {self.histogramSize}\n'
+        s += f'histogram dimension: {self.ndim}\n'
+        s += f'axes:\n'
+        for ax in self.axes:
+            s += str(ax) + '\n'
+        return s
 
     def fill_table(self):
         import numpy as np
