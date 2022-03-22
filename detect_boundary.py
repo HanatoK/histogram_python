@@ -8,15 +8,8 @@ class DetectBoundary:
     def __init__(self, hist):
         import copy
         import numpy as np
-
-        def tmp_func(x):
-            if x > 0:
-                return -1.0 * np.exp(-1.0 * x)
-            else:
-                return -1.0
-
         self.histogramP = copy.deepcopy(hist)
-        self.histogramP.data = np.vectorize(tmp_func, self.histogramP.get_data())
+        self.histogramP.data = -1.0 * np.exp(-1.0 * np.clip(self.histogramP.get_data(), 0, None))
         self.histogramV = HistogramScalar(self.histogramP.get_axes())
         point_table_transposed = self.histogramV.pointTable.T
         for pos in point_table_transposed:
@@ -47,7 +40,12 @@ if __name__ == '__main__':
     with open(args.hist, 'r') as f_hist:
         hist_input.read_from_stream(f_hist)
     detect_boundary = DetectBoundary(hist_input)
-    with open(args.output + '.histP', 'w') as f_output_p:
+    with open(args.output + '.histP', 'w') as f_output_p, \
+         open(args.output + '.grid', 'w') as f_output_colvars_factor_grid:
         detect_boundary.get_histogram_p().write_to_stream(f_output_p)
+        import copy
+        colvars_force_factor_grid = copy.deepcopy(detect_boundary.get_histogram_p())
+        colvars_force_factor_grid.data += 1.0
+        colvars_force_factor_grid.write_to_stream(f_output_colvars_factor_grid)
     with open(args.output + '.histV', 'w') as f_output_v:
         detect_boundary.get_histogram_v().write_to_stream(f_output_v)
