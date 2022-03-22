@@ -68,7 +68,7 @@ if __name__ == '__main__':
         hist_prob_source = convert_pmf_to_probability(hist_pmf, args.kbt)
         hist_prob_target = HistogramScalar.from_json_file(args.axis)
         for traj_file in args.traj:
-            with tqdm.tqdm(total=os.path.getsize(traj_file), delay=1.0) as pbar:
+            with tqdm.tqdm(total=os.path.getsize(traj_file), mininterval=1.0) as pbar:
                 pbar.set_description(f'Processing file {traj_file}')
                 with open(traj_file, 'r') as f_traj:
                     hist_prob_target = reweighting(f_traj=f_traj, prob_origin=hist_prob_source, prob_target=hist_prob_target,
