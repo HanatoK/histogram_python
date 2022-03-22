@@ -313,7 +313,6 @@ class HistogramBase:
     def __len__(self):
         raise NotImplementedError()
 
-    # TODO: test functions for accessing neighboring addresses
     def neighbor(self, pos, axis_index, previous=False):
         import copy
         bin_width_i = self.axes[axis_index].get_width()
