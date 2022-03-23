@@ -44,10 +44,10 @@ if __name__ == '__main__':
     required_args = parser.add_argument_group('required named arguments')
     required_args.add_argument('--axis', help='json file to setup axes')
     required_args.add_argument('--traj', nargs='+', help='the Colvars trajectory file', required=True)
-    required_args.add_argument('--column', type=int, nargs='+', help='the columns in the trajectory', required=True)
+    required_args.add_argument('--columns', type=int, nargs='+', help='the columns in the trajectory', required=True)
     required_args.add_argument('--output', help='the output file with weights', required=True)
     args = parser.parse_args()
-    build_histogram = BuildHistogramFromTraj(json_file=args.axis, position_cols=args.column)
+    build_histogram = BuildHistogramFromTraj(json_file=args.axis, position_cols=args.columns)
     for traj_file in args.traj:
         with open(traj_file, 'r') as f_traj:
             build_histogram.read_traj(f_traj=f_traj)
