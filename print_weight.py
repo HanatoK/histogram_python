@@ -56,12 +56,13 @@ if __name__ == '__main__':
     required_args = parser.add_argument_group('required named arguments')
     required_args.add_argument('--pmf', help='the PMF file', required=True)
     required_args.add_argument('--traj', nargs='+', help='the Colvars trajectory file', required=True)
-    required_args.add_argument('--column', type=int, nargs='+', help='the columns in the trajectory', required=True)
+    required_args.add_argument('--columns', type=int, nargs='+', help='the columns in the trajectory'
+                                                                      ' matching the CVs of the PMF', required=True)
     required_args.add_argument('--output', help='the output file with weights', required=True)
     parser.add_argument('--kbt', default=300.0*boltzmann_constant_kcalmolk, type=float, help='KbT')
     args = parser.parse_args()
     # all the arguments are mandatory
-    get_weight_traj = GetTrajWeight(args.column, args.pmf, args.kbt)
+    get_weight_traj = GetTrajWeight(args.columns, args.pmf, args.kbt)
     with open(args.output, 'w') as f_output:
         for traj_file in args.traj:
             with open(traj_file, 'r') as f_traj:
