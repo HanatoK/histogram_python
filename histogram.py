@@ -196,7 +196,9 @@ class HistogramBase:
                 self.accu[i] = self.accu[i - 1] * self.axes[i - 1].get_bin()
             self.histogramSize *= self.axes[i].get_bin()
         self.fill_table()
-        self.logger.info('\n'+str(self))
+        for s in str(self).split('\n'):
+            if s:
+                self.logger.info(s)
 
     def __str__(self) -> str:
         s = f'histogram size: {self.histogramSize}\n'
@@ -570,5 +572,5 @@ if __name__ == '__main__':
 
     # test1()
     # test2()
-    # test_json()
+    test_json()
     pass
