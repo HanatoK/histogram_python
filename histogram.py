@@ -197,15 +197,13 @@ class HistogramBase:
             self.histogramSize *= self.axes[i].get_bin()
         self.fill_table()
         for s in str(self).split('\n'):
-            if s:
-                self.logger.info(s)
+            self.logger.info(s)
 
     def __str__(self) -> str:
         s = f'histogram size: {self.histogramSize}\n'
         s += f'histogram dimension: {self.ndim}\n'
         s += f'axes:\n'
-        for ax in self.axes:
-            s += str(ax) + '\n'
+        s += '\n'.join([str(ax) for ax in self.axes])
         return s
 
     def fill_table(self):
