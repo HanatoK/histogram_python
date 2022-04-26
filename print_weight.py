@@ -31,6 +31,11 @@ class GetTrajWeight:
     def parse_traj(self, f_traj, f_output):
         total_lines = 0
         valid_lines = 0
+        weight_sum = 0.0
+        count = 0.0
+        # for the sake of saving memory, I use two round
+        # sum the weights for the first round
+        saved_pos = f_traj.tell()
         for line in f_traj:
             if line.strip().startswith('#'):
                 continue
@@ -42,7 +47,25 @@ class GetTrajWeight:
                 if self.probability.is_in_grid(tmp_position):
                     valid_lines = valid_lines + 1
                     weight = self.probability[tmp_position]
-                    f_output.write(' '.join(tmp_fields) + f' {weight:20.15f}\n')
+                    weight_sum += weight
+                    count += 1.0
+                    # f_output.write(' '.join(tmp_fields) + f' {weight:22.15e}\n')
+                else:
+                    self.logger.warning(f'position {tmp_position} is not in the boundary.')
+            else:
+                raise RuntimeError(f'Maximum column ({self.maxColumn}) is out of bound ({len(tmp_fields)})!')
+        factor = count * 1.0 / weight_sum
+        f_traj.seek(saved_pos)
+        for line in f_traj:
+            if line.strip().startswith('#'):
+                continue
+            tmp_fields = line.split()
+            if len(tmp_fields) > self.maxColumn:
+                tmp_position = [float(tmp_fields[i]) for i in self.positionColumns]
+                # check if the position is in boundary
+                if self.probability.is_in_grid(tmp_position):
+                    weight = self.probability[tmp_position]
+                    f_output.write(' '.join(tmp_fields) + f' {factor * weight:22.15e}\n')
                 else:
                     self.logger.warning(f'position {tmp_position} is not in the boundary.')
             else:

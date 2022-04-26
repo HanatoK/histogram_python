@@ -20,7 +20,7 @@ class GetTrajWeightEGABF:
         self.maxColumn = max(self.positionColumns)
         self.pmfs = list()
         self.kbt = kbt
-        self.logger.warning('The weight will not be normalized!')
+        # self.logger.warning('The weight will not be normalized!')
         # for egABF simulations, all PMFs must be 1D, and the number of PMFs should match the number of position columns
         if len(position_cols) != len(pmf_filenames):
             raise RuntimeError('The number of PMFs mismatches the number of columns')
@@ -37,6 +37,11 @@ class GetTrajWeightEGABF:
         import numpy as np
         total_lines = 0
         valid_lines = 0
+        weight_sum = 0
+        count = 0
+        # for the sake of saving memory, I use two round
+        # sum the weights for the first round
+        saved_pos = f_traj.tell()
         for line in f_traj:
             if line.strip().startswith('#'):
                 continue
@@ -59,7 +64,35 @@ class GetTrajWeightEGABF:
                         continue
                 weight = np.exp(-1.0 * sum_delta_G / self.kbt)
                 if position_in_grid:
-                    f_output.write(' '.join(tmp_fields) + f' {weight:20.15f}\n')
+                    weight_sum += weight
+                    count += 1.0
+                else:
+                    self.logger.warning(f'position {tmp_positions} is not in the boundary.')
+            else:
+                raise RuntimeError(f'Maximum column ({self.maxColumn}) is out of bound ({len(tmp_fields)})!')
+        factor = count * 1.0 / weight_sum
+        f_traj.seek(saved_pos)
+        for line in f_traj:
+            if line.strip().startswith('#'):
+                continue
+            tmp_fields = line.split()
+            if len(tmp_fields) > self.maxColumn:
+                sum_delta_G = 0
+                position_in_grid = True
+                tmp_positions = list()
+                for pmf, col_index in zip(self.pmfs, self.positionColumns):
+                    pos = float(tmp_fields[col_index])
+                    tmp_positions.append(pos)
+                    tmp_position = [pos]
+                    if pmf.is_in_grid(tmp_position):
+                        sum_delta_G += pmf[tmp_position]
+                    else:
+                        sum_delta_G = 0
+                        position_in_grid = False
+                        continue
+                weight = np.exp(-1.0 * sum_delta_G / self.kbt)
+                if position_in_grid:
+                    f_output.write(' '.join(tmp_fields) + f' {factor * weight:22.15e}\n')
                 else:
                     self.logger.warning(f'position {tmp_positions} is not in the boundary.')
             else:
