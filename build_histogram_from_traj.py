@@ -2,7 +2,7 @@
 
 class BuildHistogramFromTraj:
 
-    def __init__(self, json_file, position_cols):
+    def __init__(self, json_file, position_cols=None):
         import copy
         import logging
         from histogram import HistogramScalar
@@ -13,8 +13,11 @@ class BuildHistogramFromTraj:
         self.logger.addHandler(logging_handler)
         self.logger.setLevel(logging.INFO)
         self.histogram = HistogramScalar.from_json_file(json_file)
+        if position_cols is None:
+            position_cols = list(range(0, self.histogram.get_dimension()))
         self.positionColumns = copy.deepcopy(position_cols)
         self.maxColumn = max(self.positionColumns)
+        self.logger.info(f'Using columns: {self.positionColumns}')
 
     def read_traj(self, f_traj):
         total_lines = 0
@@ -44,8 +47,8 @@ if __name__ == '__main__':
     required_args = parser.add_argument_group('required named arguments')
     required_args.add_argument('--axis', help='json file to setup axes')
     required_args.add_argument('--traj', nargs='+', help='the Colvars trajectory file', required=True)
-    required_args.add_argument('--columns', type=int, nargs='+', help='the columns in the trajectory', required=True)
     required_args.add_argument('--output', help='the output file with weights', required=True)
+    parser.add_argument('--columns', type=int, nargs='+', help='the columns in the trajectory')
     args = parser.parse_args()
     build_histogram = BuildHistogramFromTraj(json_file=args.axis, position_cols=args.columns)
     for traj_file in args.traj:
