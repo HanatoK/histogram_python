@@ -5,15 +5,9 @@
 # Download link: https://github.com/Colvars/colvars/blob/master/colvartools/plot_colvars_traj.py?raw=true
 # Contact: giacomo.fiorin@gmail.com
 
-from __future__ import print_function
-
 import os
 import sys
 
-if (sys.version_info[:2] < (2, 7)):
-    # Save some explanations
-    print("Python versions prior to 2.7 are no longer supported.")
-    sys.exit(1)
 
 import numpy as np
 
@@ -41,10 +35,13 @@ class Colvar_traj(object):
 
     def __str__(self):
         """String representation of the trajectory"""
-        return """Trajectory of collective variable '%s':
-    Steps = [%d ... %d]
-    Values = [%f ... %f]""" % (self._name, self._step[0], self._step[-1],
-                               self._colvar[0], self._colvar[-1])
+        if len(self) > 0:
+            return """Trajectory of collective variable '%s':
+        Steps = [%d ... %d]
+        Values = [%f ... %f]""" % (self._name, self._step[0], self._step[-1],
+                                self._colvar[0], self._colvar[-1])
+        else:
+            return ''
 
     def _set_num_dimensions(self, n_d):
         """Set the number of components of the collective variable"""
@@ -158,9 +155,9 @@ class Colvars_traj(object):
         for i in range(1, len(self._keys)):
             self._start[self._keys[i]] = line.find(' '+self._keys[i]+' ')
             self._end[self._keys[i-1]] = line.find(' '+self._keys[i]+' ')
-            self._end[self._keys[-1]] = -1
+        self._end[self._keys[-1]] = -1
 
-    def _parse_line(self, line):
+    def _parse_line(self, line, dict_buffer):
         """
         Read in a data line from a colvars.traj file
         """
@@ -168,18 +165,18 @@ class Colvars_traj(object):
         step = np.int64(line[0:self._end['step']])
 
         for v in self._keys[1:]:
-            text = line[self._start[v]:self._end[v]]
-            v_v = np.fromstring(text.lstrip(' (').rstrip(') '), sep=',')
-            n_d = len(v_v)
-            if (v not in self._colvars):
-                self._colvars[v] = Colvar_traj(v)
-                self._colvars[v]._set_num_dimensions(n_d)
-            cv = self._colvars[v]
-            n = len(cv)
-            cv._resize(n+1)
-            cv.steps[n] = step
-            cv.values[n] = v_v
-
+            text = line[self._start[v]:self._end[v]].strip()
+            if (v not in dict_buffer):
+                dict_buffer[v] = {'cv_step': list(), 'cv_values': list()}
+            # got deprecation warning of using np.fromstring with sep
+            if text.startswith('('):
+                v_v = list(map(np.float64, text[1:-1].split(',')))
+                dict_buffer[v]['dimension'] = len(v_v)
+            else:
+                v_v = np.float64(text)
+                dict_buffer[v]['dimension'] = 1
+            dict_buffer[v]['cv_step'].append(step)
+            dict_buffer[v]['cv_values'].append(v_v)
 
     def read_files(self, filenames, list_variables=False,
                    first=0, last=-1, every=1):
@@ -202,6 +199,7 @@ class Colvars_traj(object):
             last = np.int64(np.iinfo(np.int64).max)
         last_step = -1
         for f in [open(filename) for filename in filenames]:
+            dict_buffer = dict()
             for line in f:
                 if (len(line) == 0): continue
                 if (line[:1] == "@"): continue # xmgr file metadata
@@ -214,19 +212,29 @@ class Colvars_traj(object):
                 if (step == last_step): continue
                 if ((self._frame >= first) and (self._frame <= last) and
                     (self._frame % every == 0)):
-                    self._parse_line(line)
+                    self._parse_line(line, dict_buffer)
                 self._frame += 1
                 last_step = step
+            for key in dict_buffer:
+                if (key not in self._colvars):
+                    self._colvars[key] = Colvar_traj(key)
+                    self._colvars[key]._set_num_dimensions(dict_buffer[key]['dimension'])
+                cv = self._colvars[key]
+                cv._step = np.concatenate((cv.steps, dict_buffer[key]['cv_step']), axis=0)
+                cv._colvar = np.concatenate((cv.values, dict_buffer[key]['cv_values']), axis=0)
             f.close()
 
-
-    def as_pandas(self):
+    def as_pandas(self, keys=None):
         """
         Export data to pandas DataFrame
+        keys : list of strings
+            list of keys to be read
         """
         import pandas as pd
         tmp_dict = dict()
-        for key in self.variables:
+        if keys is None:
+            keys = self.variables
+        for key in keys:
             tmp_dict[key] = self.__getitem__(key).values.tolist()
         return pd.DataFrame(data=tmp_dict)
 
