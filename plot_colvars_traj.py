@@ -103,7 +103,7 @@ class Colvars_traj(object):
     _found = {}
     _frame = -1
 
-    def __init__(self, filenames=None, first=0, last=-1, every=1):
+    def __init__(self, filenames=None, first=0, last=-1, every=1, use_new_step_data=False):
         """
         Initialize from the given list of colvars.traj files
         Any optional arguments are passed to read_files()
@@ -113,11 +113,12 @@ class Colvars_traj(object):
         self._end['step'] = -1
         self._count = 0
         self._frame = 0
+        self._use_new_step_data = use_new_step_data
         if type(filenames) == str:
             filenames = [filenames]
         if filenames:
             self.read_files(filenames=filenames, first=first, last=last,
-                            every=every)
+                            every=every, use_new_step_data=self._use_new_step_data)
 
     def __getitem__(self, key):
         return self._colvars[key]
@@ -195,7 +196,7 @@ class Colvars_traj(object):
                 current_colvar['cv_step'].append(step)
 
     def read_files(self, filenames, list_variables=False,
-                   first=0, last=-1, every=1):
+                   first=0, last=-1, every=1, use_new_step_data=False):
         """
         Read a series of colvars.traj files.
         filenames : list of strings
@@ -226,7 +227,8 @@ class Colvars_traj(object):
                     return self.variables
                 step = np.int64(line[0:self._end['step']])
                 if (step == last_step):
-                    self._parse_line(line, dict_buffer, True)
+                    if use_new_step_data:
+                        self._parse_line(line, dict_buffer, True)
                     continue
                 if ((self._frame >= first) and (self._frame <= last) and
                     (self._frame % every == 0)):
