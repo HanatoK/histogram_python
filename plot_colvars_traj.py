@@ -20,15 +20,12 @@ class Colvar_traj(object):
     variables may be added or deleted during a simulation.
     """
 
-    _name = ""
-    _step = np.empty(shape=(0))
-    _colvar = np.empty(shape=(0))
-
     def __init__(self, name):
         """Sets the name of the variable"""
         self._name = name
-        self._step = np.zeros(shape=(0), dtype=np.int64)
-        self._colvar = np.zeros(shape=(0), dtype=np.float64)
+        self._step = list()
+        self._colvar = list()
+        self._dimension = 0
 
     def __len__(self):
         """Returns the length of the trajectory"""
@@ -47,18 +44,7 @@ class Colvar_traj(object):
             print("Warning: changing the number of dimensions "
                   "of collective variable \""+self._name+
                   "\" after it has already been read.")
-        if (n_d > 1):
-            self._colvar.resize((len(self), n_d))
-        else:
-            self._colvar.resize((len(self)))
-
-    def _resize(self, n):
-        """Change the number of records in the trajectory"""
-        self._step.resize((n))
-        if (len(self._colvar.shape) > 1):
-            self._colvar.resize((n, self._colvar.shape[1]))
-        else:
-            self._colvar.resize((n))
+        self._dimension = n_d
 
     @property
     def name(self):
@@ -68,11 +54,7 @@ class Colvar_traj(object):
     @property
     def num_dimensions(self):
         """Dimensionality of the collective variable (d)"""
-        s = self._colvar.shape
-        if (len(s) > 1):
-            return s[1]
-        else:
-            return 1
+        return self._dimension
 
     @property
     def num_frames(self):
@@ -82,12 +64,12 @@ class Colvar_traj(object):
     @property
     def steps(self):
         """The array of step numbers, with shape = (n,)"""
-        return self._step
+        return np.array(self._step)
 
     @property
     def values(self):
         """The array of collective variable values, with shape = (n, d)"""
-        return self._colvar
+        return np.array(self._colvar)
 
 
 class Colvars_traj(object):
@@ -169,15 +151,15 @@ class Colvars_traj(object):
         Read in a data line from a colvars.traj file
         """
 
-        step = np.int64(line[0:self._end['step']])
+        step = int(line[0:self._end['step']])
         for v in self._keys[1:]:
             text = line[self._start[v]:self._end[v]].strip()
             current_colvar = dict_buffer[v]
             if text[0] == '(':
-                v_v = np.fromstring(text[1:-1], sep=',')
+                v_v = list(map(float, text[1:-1].split(',')))
                 current_colvar['dimension'] = len(v_v)
             else:
-                v_v = np.float64(text)
+                v_v = float(text)
                 current_colvar['dimension'] = 1
             if overlapping_step:
                 # if two lines have the same step number
@@ -211,9 +193,9 @@ class Colvars_traj(object):
         every : int
             read every these many records
         """
-        last = np.int64(last)
+        last = int(last)
         if (last == -1):
-            last = np.int64(np.iinfo(np.int64).max)
+            last = sys.maxsize
         last_step = -1
         for f in [open(filename) for filename in filenames]:
             dict_buffer = dict()
@@ -225,7 +207,7 @@ class Colvars_traj(object):
                     continue
                 if list_variables:
                     return self.variables
-                step = np.int64(line[0:self._end['step']])
+                step = int(line[0:self._end['step']])
                 if (step == last_step):
                     if use_new_step_data:
                         self._parse_line(line, dict_buffer, True)
@@ -240,8 +222,8 @@ class Colvars_traj(object):
                     self._colvars[key] = Colvar_traj(key)
                     self._colvars[key]._set_num_dimensions(dict_buffer[key]['dimension'])
                 cv = self._colvars[key]
-                cv._step = np.concatenate((cv.steps, dict_buffer[key]['cv_step']), axis=0)
-                cv._colvar = np.concatenate((cv.values, dict_buffer[key]['cv_values']), axis=0)
+                cv._step += dict_buffer[key]['cv_step']
+                cv._colvar += dict_buffer[key]['cv_values']
             f.close()
 
     def as_pandas(self, keys=None):
@@ -256,8 +238,8 @@ class Colvars_traj(object):
             keys = self.variables
         series = list()
         for key in keys:
-            series.append(pd.Series(data=self.__getitem__(key).values.tolist(),
-                                    index=self.__getitem__(key).steps,
+            series.append(pd.Series(data=self.__getitem__(key)._colvar,
+                                    index=self.__getitem__(key)._step,
                                     name=key))
         df = pd.concat(series, axis=1).reset_index()
         df.rename(columns={'index': 'step'}, inplace=True)
