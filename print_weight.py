@@ -20,6 +20,8 @@ class GetTrajWeight:
         self.positionColumns = copy.deepcopy(position_cols)
         self.maxColumn = max(self.positionColumns)
         self.probability = None
+        self.weight_sum = 0
+        self.count = 0
         with open(pmf_filename, 'r') as f_pmf:
             pmf = HistogramScalar()
             pmf.read_from_stream(f_pmf)
@@ -28,14 +30,11 @@ class GetTrajWeight:
         if self.probability.get_dimension() != len(self.positionColumns):
             self.logger.warning('the number of columns selected does not match the dimension of the PMF!')
 
-    def parse_traj(self, f_traj, f_output):
+    def accumulate_weights_sum(self, f_traj):
         total_lines = 0
         valid_lines = 0
-        weight_sum = 0.0
-        count = 0.0
         # for the sake of saving memory, I use two round
         # sum the weights for the first round
-        saved_pos = f_traj.tell()
         for line in f_traj:
             if line.strip().startswith('#'):
                 continue
@@ -47,24 +46,37 @@ class GetTrajWeight:
                 if self.probability.is_in_grid(tmp_position):
                     valid_lines = valid_lines + 1
                     weight = self.probability[tmp_position]
-                    weight_sum += weight
-                    count += 1.0
+                    self.weight_sum += weight
+                    self.count += 1.0
                     # f_output.write(' '.join(tmp_fields) + f' {weight:22.15e}\n')
                 else:
                     self.logger.warning(f'position {tmp_position} is not in the boundary.')
             else:
                 raise RuntimeError(f'Maximum column ({self.maxColumn}) is out of bound ({len(tmp_fields)})!')
-        factor = count * 1.0 / weight_sum
-        f_traj.seek(saved_pos)
+        self.logger.info(f'(Accumulate weights) Total data lines: {total_lines}')
+        self.logger.info(f'(Accumulate weights) Valid data lines: {valid_lines}')
+
+    def parse_traj(self, f_traj, f_output):
+        total_lines = 0
+        valid_lines = 0
+        try:
+            factor = self.count * 1.0 / self.weight_sum
+        except ZeroDivisionError:
+            print('Warning: weight sum is 0, please running accumulate_weights_sum at first!')
+            print('Continue with factor = 1.0')
+            factor = 1.0
+            self.weight_sum = self.count
         for line in f_traj:
             if line.strip().startswith('#'):
                 continue
+            total_lines = total_lines + 1
             tmp_fields = line.split()
             if len(tmp_fields) > self.maxColumn:
                 tmp_position = [float(tmp_fields[i]) for i in self.positionColumns]
                 # check if the position is in boundary
                 if self.probability.is_in_grid(tmp_position):
                     weight = self.probability[tmp_position]
+                    valid_lines = valid_lines + 1
                     f_output.write(' '.join(tmp_fields) + f' {factor * weight:22.15e}\n')
                 else:
                     self.logger.warning(f'position {tmp_position} is not in the boundary.')
@@ -86,6 +98,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # all the arguments are mandatory
     get_weight_traj = GetTrajWeight(args.columns, args.pmf, args.kbt)
+    for traj_file in args.traj:
+        with open(traj_file, 'r') as f_traj:
+            get_weight_traj.accumulate_weights_sum(f_traj)
     with open(args.output, 'w') as f_output:
         for traj_file in args.traj:
             with open(traj_file, 'r') as f_traj:
