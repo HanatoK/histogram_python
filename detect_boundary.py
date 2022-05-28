@@ -46,7 +46,8 @@ if __name__ == '__main__':
         detect_boundary.get_histogram_p().write_to_stream(f_output_p)
         import copy
         colvars_force_factor_grid = copy.deepcopy(hist_input)
-        colvars_force_factor_grid.data = np.clip(colvars_force_factor_grid.data, 0, 1)
+        boundary_abs = np.abs(detect_boundary.get_histogram_v().data)
+        colvars_force_factor_grid.data = np.sign(colvars_force_factor_grid.data + boundary_abs)
         colvars_force_factor_grid.write_to_stream(f_output_colvars_factor_grid)
     with open(args.output + '.histV', 'w') as f_output_v:
         detect_boundary.get_histogram_v().write_to_stream(f_output_v)
