@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from histogram import HistogramScalar
 import argparse
+import numpy as np
 
 
 class DetectBoundary:
@@ -44,8 +45,8 @@ if __name__ == '__main__':
          open(args.output + '.grid', 'w') as f_output_colvars_factor_grid:
         detect_boundary.get_histogram_p().write_to_stream(f_output_p)
         import copy
-        colvars_force_factor_grid = copy.deepcopy(detect_boundary.get_histogram_p())
-        colvars_force_factor_grid.data += 1.0
+        colvars_force_factor_grid = copy.deepcopy(hist_input)
+        colvars_force_factor_grid.data = np.clip(colvars_force_factor_grid.data, 0, 1)
         colvars_force_factor_grid.write_to_stream(f_output_colvars_factor_grid)
     with open(args.output + '.histV', 'w') as f_output_v:
         detect_boundary.get_histogram_v().write_to_stream(f_output_v)
