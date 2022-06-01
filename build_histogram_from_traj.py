@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+from read_colvars_traj import ReadSpaceSeparatedTraj, ReadColvarsTraj
+
 
 class BuildHistogramFromTraj:
 
-    def __init__(self, json_file, position_cols=None):
+    def __init__(self, json_file, position_cols):
         import copy
         import logging
         from histogram import HistogramScalar
@@ -17,23 +19,19 @@ class BuildHistogramFromTraj:
             self.positionColumns = list(range(0, self.histogram.get_dimension()))
         else:
             self.positionColumns = copy.deepcopy(position_cols)
-        self.maxColumn = max(self.positionColumns)
+        # self.maxColumn = max(self.positionColumns)
 
     def read_traj(self, f_traj):
         total_lines = 0
         valid_lines = 0
         for line in f_traj:
-            if line.startswith('#'):
-                continue
-            tmp_fields = line.split()
-            if len(tmp_fields) > self.maxColumn:
-                total_lines += 1
-                tmp_position = [float(tmp_fields[i]) for i in self.positionColumns]
-                if self.histogram.is_in_grid(tmp_position):
-                    self.histogram[tmp_position] += 1.0
-                    valid_lines += 1
-                else:
-                    self.logger.warning(f'Position {tmp_position} is not in the boundary!')
+            total_lines += 1
+            tmp_position = [line[key] for key in self.positionColumns]
+            if self.histogram.is_in_grid(tmp_position):
+                self.histogram[tmp_position] += 1.0
+                valid_lines += 1
+            else:
+                self.logger.warning(f'Position {tmp_position} is not in the boundary!')
         self.logger.info(f'Total data lines: {total_lines}')
         self.logger.info(f'Valid data lines: {valid_lines}')
 
@@ -48,11 +46,16 @@ if __name__ == '__main__':
     required_args.add_argument('--axis', help='json file to setup axes')
     required_args.add_argument('--traj', nargs='+', help='the Colvars trajectory file', required=True)
     required_args.add_argument('--output', help='the output file with weights', required=True)
-    parser.add_argument('--columns', type=int, nargs='+', help='columns in the trajectory (default to 0...Ndim)')
+    parser.add_argument('--columns', type=str, nargs='+', help='columns in the trajectory (default to 0...Ndim)')
     args = parser.parse_args()
     build_histogram = BuildHistogramFromTraj(json_file=args.axis, position_cols=args.columns)
-    for traj_file in args.traj:
-        with open(traj_file, 'r') as f_traj:
-            build_histogram.read_traj(f_traj=f_traj)
+    if args.columns is None:
+        for traj_file in args.traj:
+            with ReadSpaceSeparatedTraj(traj_file) as f_traj:
+                build_histogram.read_traj(f_traj=f_traj)
+    else:
+        for traj_file in args.traj:
+            with ReadColvarsTraj(traj_file) as f_traj:
+                build_histogram.read_traj(f_traj=f_traj)
     with open(args.output, 'w') as f_output:
         build_histogram.get_histogram().write_to_stream(stream=f_output)

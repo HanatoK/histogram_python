@@ -1,5 +1,57 @@
 #!/usr/bin/env python3
 
+class ReadSpaceSeparatedTraj:
+
+    def __init__(self, filename):
+        # from collections import OrderedDict
+        self.f_traj = open(filename, 'r')
+        self.parsed_line = dict()
+        self._fields = list()
+        self._line = ''
+        self._start = {}
+        self._end = {}
+        self._eof = False
+
+    def _parse_comment_line(self):
+        pass
+
+    def _parse_data_line(self):
+        data = map(float, self._line.split())
+        for i, x in enumerate(data):
+            self.parsed_line[i] = x
+
+    def _read_line(self):
+        self._line = self.f_traj.readline()
+        if self._line == '':
+            self._eof = True
+            return
+        while self._line.strip() == '':
+            self._line = self.f_traj.readline()
+        while self._line[0] == '#':
+            self._parse_comment_line()
+            self._line = self.f_traj.readline()
+        self._parse_data_line()
+
+    def current_str(self):
+        return self._line
+
+    def __iter__(self):
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __next__(self):
+        if self._eof is False:
+            self._read_line()
+            if self._eof is False:
+                return self.parsed_line
+            else:
+                raise StopIteration
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.f_traj.close()
+
 
 class ReadColvarsTraj:
 
@@ -15,7 +67,7 @@ class ReadColvarsTraj:
     def _parse_comment_line(self):
         self.parsed_line = dict()
         self._fields = self._line[1:].split()
-        if (self._fields[0] != 'step'):
+        if self._fields[0] != 'step':
             raise KeyError("Error: file format incompatible with colvars.traj")
         for i in range(1, len(self._fields)):
             if i == 1:
