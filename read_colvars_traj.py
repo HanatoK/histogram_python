@@ -51,6 +51,9 @@ class ReadColvarsTraj:
             self._line = self.f_traj.readline()
         self._parse_data_line()
 
+    def current_str(self):
+        return self._line
+
     def __iter__(self):
         return self
 
