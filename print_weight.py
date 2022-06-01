@@ -4,6 +4,7 @@ from histogram import HistogramScalar
 from boltzmann_constant import boltzmann_constant_kcalmolk
 import argparse
 from read_colvars_traj import ReadColvarsTraj
+import csv
 
 
 class GetTrajWeight:
@@ -51,7 +52,7 @@ class GetTrajWeight:
         self.logger.info(f'(Accumulate weights) Valid data lines: {valid_lines}')
         self.logger.info(f'(Accumulate weights) Total weights: {self.weight_sum}')
 
-    def parse_traj(self, f_traj, f_output):
+    def parse_traj(self, f_traj, f_output, firsttime=False, csv_writer=None):
         total_lines = 0
         valid_lines = 0
         try:
@@ -62,12 +63,19 @@ class GetTrajWeight:
             factor = 1.0
             self.weight_sum = self.count
         for line in f_traj:
+            line['weight'] = 0
+            if firsttime:
+                if csv_writer is None:
+                    csv_writer = csv.DictWriter(f_output, fieldnames=line.keys())
+                    csv_writer.writeheader()
+                firsttime = True
             total_lines = total_lines + 1
             tmp_position = [line[i] for i in self.column_names]
             if self.probability.is_in_grid(tmp_position):
-                weight = self.probability[tmp_position]
+                line['weight'] = self.probability[tmp_position] * factor
                 valid_lines = valid_lines + 1
-                f_output.write(f_traj.current_str().rstrip('\n') + f' {factor * weight:22.15e}\n')
+                csv_writer.writerow(line)
+                # f_output.write(f_traj.current_str().rstrip('\n') + f' {factor * weight:22.15e}\n')
             else:
                 self.logger.warning(f'position {tmp_position} is not in the boundary.')
         self.logger.info(f'(parse_traj) Total data lines: {total_lines}')
@@ -89,7 +97,8 @@ if __name__ == '__main__':
     for traj_file in args.traj:
         with ReadColvarsTraj(traj_file) as f_traj:
             get_weight_traj.accumulate_weights_sum(f_traj)
+    firsttime = True
     with open(args.output, 'w') as f_output:
         for traj_file in args.traj:
             with ReadColvarsTraj(traj_file) as f_traj:
-                get_weight_traj.parse_traj(f_traj, f_output)
+                get_weight_traj.parse_traj(f_traj, f_output, firsttime)
