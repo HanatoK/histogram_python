@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # from histogram import Axis
+import math
 from histogram import HistogramScalar
 from boltzmann_constant import boltzmann_constant_kcalmolk
 import argparse
@@ -72,7 +73,10 @@ class GetTrajWeight:
             total_lines = total_lines + 1
             tmp_position = [line[i] for i in self.column_names]
             if self.probability.is_in_grid(tmp_position):
-                line['weight'] = self.probability[tmp_position] * factor
+                w = self.probability[tmp_position] * factor
+                if math.isnan(w):
+                    w = 1.0
+                line['weight'] = w
                 valid_lines = valid_lines + 1
                 csv_writer.writerow(line)
                 # f_output.write(f_traj.current_str().rstrip('\n') + f' {factor * weight:22.15e}\n')
