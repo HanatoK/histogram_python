@@ -53,7 +53,7 @@ class GetTrajWeight:
         self.logger.info(f'(Accumulate weights) Valid data lines: {valid_lines}')
         self.logger.info(f'(Accumulate weights) Total weights: {self.weight_sum}')
 
-    def parse_traj(self, f_traj, f_output, firsttime=False, csv_writer=None):
+    def parse_traj(self, f_traj, f_output, first_time=False, csv_writer=None):
         total_lines = 0
         valid_lines = 0
         try:
@@ -65,11 +65,11 @@ class GetTrajWeight:
             self.weight_sum = self.count
         for line in f_traj:
             line['weight'] = 0
-            if firsttime:
-                if csv_writer is None:
-                    csv_writer = csv.DictWriter(f_output, fieldnames=line.keys())
-                    csv_writer.writeheader()
-                firsttime = True
+            if csv_writer is None:
+                csv_writer = csv.DictWriter(f_output, fieldnames=line.keys())
+            if first_time:
+                csv_writer.writeheader()
+                first_time = False
             total_lines = total_lines + 1
             tmp_position = [line[i] for i in self.column_names]
             if self.probability.is_in_grid(tmp_position):
@@ -84,6 +84,7 @@ class GetTrajWeight:
                 self.logger.warning(f'position {tmp_position} is not in the boundary.')
         self.logger.info(f'(parse_traj) Total data lines: {total_lines}')
         self.logger.info(f'(parse_traj) Valid data lines: {valid_lines}')
+        return first_time
 
 
 if __name__ == '__main__':
@@ -101,8 +102,8 @@ if __name__ == '__main__':
     for traj_file in args.traj:
         with ReadColvarsTraj(traj_file) as f_traj:
             get_weight_traj.accumulate_weights_sum(f_traj)
-    firsttime = True
+    first_time = True
     with open(args.output, 'w') as f_output:
         for traj_file in args.traj:
             with ReadColvarsTraj(traj_file) as f_traj:
-                get_weight_traj.parse_traj(f_traj, f_output, firsttime)
+                first_time = get_weight_traj.parse_traj(f_traj, f_output, first_time)
