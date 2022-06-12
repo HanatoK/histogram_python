@@ -78,23 +78,17 @@ class Colvars_traj(object):
     Can be accessed as a dictionary using a variable's name as key; each
     variable's trajectory is an instance of colvars_traj"""
 
-    _keys = []
-    _start = {}
-    _end = {}
-    _colvars = {}
-    _found = {}
-    _frame = -1
-
     def __init__(self, filenames=None, first=0, last=-1, every=1, use_new_step_data=False):
         """
         Initialize from the given list of colvars.traj files
         Any optional arguments are passed to read_files()
         """
         self._keys = ['step']
-        self._start['step'] = 0
-        self._end['step'] = -1
+        self._start = {'step': 0}
+        self._end = {'step': -1}
         self._count = 0
         self._frame = 0
+        self._colvars = dict()
         self._use_new_step_data = use_new_step_data
         if type(filenames) == str:
             filenames = [filenames]
@@ -144,7 +138,6 @@ class Colvars_traj(object):
             if (self._keys[i] not in dict_buffer):
                 dict_buffer[self._keys[i]] = {'cv_step': list(), 'cv_values': list()}
         self._end[self._keys[-1]] = -1
-
 
     def _parse_line(self, line, dict_buffer, overlapping_step=False):
         """
