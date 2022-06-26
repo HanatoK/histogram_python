@@ -6,6 +6,7 @@ import argparse
 from read_colvars_traj import ReadColvarsTraj
 import numpy as np
 import csv
+from scipy.special import logsumexp
 
 
 class GetTrajWeightEGABF:
@@ -25,6 +26,7 @@ class GetTrajWeightEGABF:
         # self.maxColumn = max(self.positionColumns)
         self.pmfs = list()
         self.kbt = kbt
+        self.log_weights = list()
         # self.logger.warning('The weight will not be normalized!')
         # for egABF simulations, all PMFs must be 1D, and the number of PMFs should match the number of position columns
         if len(column_names) != len(pmf_filenames):
@@ -61,15 +63,18 @@ class GetTrajWeightEGABF:
             if position_in_grid:
                 self.weight_sum += weight
                 self.count += 1.0
+                self.log_weights.append(-1.0 * sum_delta_G / self.kbt)
             else:
                 self.logger.warning(f'position {tmp_positions} is not in the boundary.')
 
     def parse_traj(self, f_traj, f_output, first_time=False, csv_writer=None):
         factor = self.count * 1.0 / self.weight_sum
+        log_const = np.log(self.count) - logsumexp(a=self.log_weights)
         total_lines = 0
         valid_lines = 0
         for line in f_traj:
             line['weight'] = 0
+            line['log_weight'] = 0
             if csv_writer is None:
                 csv_writer = csv.DictWriter(f_output, fieldnames=line.keys())
             if first_time:
@@ -90,8 +95,9 @@ class GetTrajWeightEGABF:
                         sum_delta_G = 0
                         position_in_grid = False
                         continue
-            line['weight'] = factor * np.exp(-1.0 * sum_delta_G / self.kbt)
             if position_in_grid:
+                line['weight'] = factor * np.exp(-1.0 * sum_delta_G / self.kbt)
+                line['log_weight'] = -1.0 * sum_delta_G / self.kbt + log_const
                 csv_writer.writerow(line)
             else:
                 self.logger.warning(f'position {tmp_positions} is not in the boundary.')

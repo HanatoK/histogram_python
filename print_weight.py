@@ -6,6 +6,7 @@ from boltzmann_constant import boltzmann_constant_kcalmolk
 import argparse
 from read_colvars_traj import ReadColvarsTraj
 import csv
+from scipy.special import logsumexp
 
 
 class GetTrajWeight:
@@ -24,11 +25,14 @@ class GetTrajWeight:
         self.probability = None
         self.weight_sum = 0
         self.count = 0
+        self.log_weights = []
         with open(pmf_filename, 'r') as f_pmf:
             pmf = HistogramScalar()
             pmf.read_from_stream(f_pmf)
-            pmf.data = np.exp(-1.0 * pmf.data / kbt)
-            self.probability = pmf
+            pmf.data = -1.0 * pmf.data / kbt
+            self.log_probability = pmf
+            self.probability = copy.deepcopy(pmf)
+            self.probability.data = np.exp(self.probability.data)
         if self.probability.get_dimension() != len(self.column_names):
             self.logger.warning('the number of columns selected does not match the dimension of the PMF!')
         self.logger.info(f'Get weights from PMF file {pmf_filename}')
@@ -44,6 +48,7 @@ class GetTrajWeight:
             if self.probability.is_in_grid(tmp_position):
                 valid_lines = valid_lines + 1
                 weight = self.probability[tmp_position]
+                self.log_weights.append(self.log_probability[tmp_position])
                 self.weight_sum += weight
                 self.count += 1.0
                 # f_output.write(' '.join(tmp_fields) + f' {weight:22.15e}\n')
@@ -63,8 +68,10 @@ class GetTrajWeight:
             print('Continue with factor = 1.0')
             factor = 1.0
             self.weight_sum = self.count
+        log_const = math.log(self.count) - logsumexp(a=self.log_weights)
         for line in f_traj:
             line['weight'] = 0
+            line['log_weight'] = 0
             if csv_writer is None:
                 csv_writer = csv.DictWriter(f_output, fieldnames=line.keys())
             if first_time:
@@ -77,6 +84,7 @@ class GetTrajWeight:
                 if math.isnan(w):
                     w = 1.0
                 line['weight'] = w
+                line['log_weight'] = self.log_probability[tmp_position] + log_const
                 valid_lines = valid_lines + 1
                 csv_writer.writerow(line)
                 # f_output.write(f_traj.current_str().rstrip('\n') + f' {factor * weight:22.15e}\n')
