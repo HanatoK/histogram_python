@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from histogram import HistogramScalar
-from boltzmann_constant import boltzmann_constant_kcalmolk
 import argparse
 
 
@@ -50,6 +49,7 @@ def reweighting(f_traj, prob_origin, prob_target, from_columns, to_columns, pbar
 if __name__ == '__main__':
     import os
     import tqdm
+    from boltzmann_constant import boltzmann_constant_kcalmolk
     parser = argparse.ArgumentParser(description='Calculate PMF along CVs from traj by reweighting PMF')
     required_args = parser.add_argument_group('required named arguments')
     required_args.add_argument('--pmf', help='the PMF file', required=True)
