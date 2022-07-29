@@ -72,11 +72,14 @@ class GetTrajWeightEGABF:
         log_const = np.log(self.count) - logsumexp(a=self.log_weights)
         total_lines = 0
         valid_lines = 0
+        cv_weight = dict()
+        for column_name in self.column_names:
+            cv_weight[f'{column_name}_weight'] = 0.0
         for line in f_traj:
             line['weight'] = 0
             line['log_weight'] = 0
             if csv_writer is None:
-                csv_writer = csv.DictWriter(f_output, fieldnames=line.keys())
+                csv_writer = csv.DictWriter(f_output, fieldnames=(list(line.keys()) + list(cv_weight.keys())))
             if first_time:
                 csv_writer.writeheader()
                 first_time = False
@@ -89,6 +92,7 @@ class GetTrajWeightEGABF:
                     tmp_positions.append(pos)
                     tmp_position = [pos]
                     if pmf.is_in_grid(tmp_position):
+                        cv_weight[f'{column_name}_weight'] = np.exp(-1.0 * pmf[tmp_position] / self.kbt)
                         valid_lines += 1
                         sum_delta_G += pmf[tmp_position]
                     else:
@@ -98,7 +102,7 @@ class GetTrajWeightEGABF:
             if position_in_grid:
                 line['weight'] = factor * np.exp(-1.0 * sum_delta_G / self.kbt)
                 line['log_weight'] = -1.0 * sum_delta_G / self.kbt + log_const
-                csv_writer.writerow(line)
+                csv_writer.writerow({**line, **cv_weight})
             else:
                 self.logger.warning(f'position {tmp_positions} is not in the boundary.')
         self.logger.info(f'Total data lines: {total_lines}')
