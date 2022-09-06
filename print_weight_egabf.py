@@ -7,6 +7,7 @@ from read_colvars_traj import ReadColvarsTraj
 import numpy as np
 import csv
 from scipy.special import logsumexp
+import gzip
 
 
 class GetTrajWeightEGABF:
@@ -126,7 +127,7 @@ if __name__ == '__main__':
     for traj_file in args.traj:
         with ReadColvarsTraj(traj_file) as f_traj:
             get_weight_traj.accumulate_weights_sum(f_traj)
-    with open(args.output, 'w') as f_output:
+    with gzip.open(f'{args.output}.gz', 'w') as f_output:
         for traj_file in args.traj:
             with ReadColvarsTraj(traj_file) as f_traj:
                 first_time, csv_writer = get_weight_traj.parse_traj(f_traj, f_output, first_time, csv_writer)
