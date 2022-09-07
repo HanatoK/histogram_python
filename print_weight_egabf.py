@@ -28,6 +28,8 @@ class GetTrajWeightEGABF:
         self.pmfs = list()
         self.kbt = kbt
         self.log_weights = list()
+        self.max_sum_dG = None
+        self.max_CV_dG = [0] * len(column_names)
         # self.logger.warning('The weight will not be normalized!')
         # for egABF simulations, all PMFs must be 1D, and the number of PMFs should match the number of position columns
         if len(column_names) != len(pmf_filenames):
@@ -49,7 +51,7 @@ class GetTrajWeightEGABF:
             position_in_grid = True
             sum_delta_G = 0
             tmp_positions = list()
-            for pmf, column_name in zip(self.pmfs, self.column_names):
+            for i, (pmf, column_name) in enumerate(zip(self.pmfs, self.column_names)):
                 if position_in_grid:
                     pos = float(line[column_name])
                     tmp_positions.append(pos)
@@ -57,10 +59,20 @@ class GetTrajWeightEGABF:
                     if pmf.is_in_grid(tmp_position):
                         valid_lines += 1
                         sum_delta_G += pmf[tmp_position]
+                        if self.max_CV_dG[i] is None:
+                            self.max_CV_dG[i] = pmf[tmp_position]
+                        else:
+                            if pmf[tmp_position] > self.max_CV_dG[i]:
+                                self.max_CV_dG[i] = pmf[tmp_position]
                     else:
                         sum_delta_G = 0
                         position_in_grid = False
             weight = np.exp(-1.0 * sum_delta_G / self.kbt)
+            if self.max_sum_dG is None:
+                self.max_sum_dG = sum_delta_G
+            else:
+                if sum_delta_G > self.max_sum_dG:
+                    self.max_sum_dG = sum_delta_G
             if position_in_grid:
                 self.weight_sum += weight
                 self.count += 1.0
@@ -77,6 +89,7 @@ class GetTrajWeightEGABF:
         for column_name in self.column_names:
             cv_weight[f'{column_name}_weight'] = 0.0
         for line in f_traj:
+            total_lines += 1
             line['weight'] = 0
             line['log_weight'] = 0
             if csv_writer is None:
@@ -87,7 +100,7 @@ class GetTrajWeightEGABF:
             sum_delta_G = 0
             position_in_grid = True
             tmp_positions = list()
-            for pmf, column_name in zip(self.pmfs, self.column_names):
+            for i, (pmf, column_name) in enumerate(zip(self.pmfs, self.column_names)):
                 if position_in_grid:
                     pos = float(line[column_name])
                     tmp_positions.append(pos)
@@ -97,15 +110,19 @@ class GetTrajWeightEGABF:
                         valid_lines += 1
                         sum_delta_G += pmf[tmp_position]
                     else:
+                        cv_weight[f'{column_name}_weight'] = np.exp(-1.0 * self.max_CV_dG[i] / self.kbt)
                         sum_delta_G = 0
                         position_in_grid = False
                         continue
             if position_in_grid:
                 line['weight'] = factor * np.exp(-1.0 * sum_delta_G / self.kbt)
                 line['log_weight'] = -1.0 * sum_delta_G / self.kbt + log_const
-                csv_writer.writerow({**line, **cv_weight})
             else:
+                # prevent the destruction of time series
+                line['weight'] = factor * np.exp(-1.0 * self.max_sum_dG / self.kbt)
+                line['log_weight'] = -1.0 * self.max_sum_dG / self.kbt + log_const
                 self.logger.warning(f'position {tmp_positions} is not in the boundary.')
+            csv_writer.writerow({**line, **cv_weight})
         self.logger.info(f'Total data lines: {total_lines}')
         self.logger.info(f'Valid data lines: {valid_lines}')
         return first_time, csv_writer

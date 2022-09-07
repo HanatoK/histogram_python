@@ -87,10 +87,12 @@ class GetTrajWeight:
                 line['weight'] = w
                 line['log_weight'] = self.log_probability[tmp_position] + log_const
                 valid_lines = valid_lines + 1
-                csv_writer.writerow(line)
                 # f_output.write(f_traj.current_str().rstrip('\n') + f' {factor * weight:22.15e}\n')
             else:
+                line['weight'] = min(self.probability) * factor
+                line['log_weight'] = max(self.log_probability) + log_const
                 self.logger.warning(f'position {tmp_position} is not in the boundary.')
+            csv_writer.writerow(line)
         self.logger.info(f'(parse_traj) Total data lines: {total_lines}')
         self.logger.info(f'(parse_traj) Valid data lines: {valid_lines}')
         return first_time
