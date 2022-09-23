@@ -325,6 +325,12 @@ class HistogramBase:
     def __len__(self):
         raise NotImplementedError()
 
+    def __getitem__(self, key):
+        raise NotImplementedError()
+
+    def __setitem__(self, key, value):
+        raise NotImplementedError()
+
     def neighbor(self, pos, axis_index, previous=False):
         import copy
         bin_width_i = self.axes[axis_index].get_width()
@@ -355,6 +361,35 @@ class HistogramBase:
             results.append(self.neighbor_by_address(addr, i, True))
             results.append(self.neighbor_by_address(addr, i, False))
         return results
+
+    def write_to_dx(self, stream):
+        axes_bins = [str(ax.get_bin()) for ax in self.axes]
+        axes_origins = [str(ax.get_lower_bound() + 0.5 * ax.get_width()) for ax in self.axes]
+        stream.write(f'object 1 class gridpositions counts {" ".join(axes_bins)}\n')
+        stream.write(f'origin {" ".join(axes_origins)}\n')
+        ax_widths = [ax.get_width() for ax in self.axes]
+        for i in range(0, len(ax_widths)):
+            stream.write('delta ')
+            for j in range(0, len(ax_widths)):
+                if i == j:
+                    stream.write(f' {ax_widths[i]}')
+                else:
+                    stream.write(' 0')
+            stream.write('\n')
+        stream.write(f'object 2 class gridconnections counts {" ".join(axes_bins)}\n')
+        stream.write(f'object 3 class array type double rank 0 items {len(self)} data follows')
+        pos = [0] * self.get_dimension()
+        write_count = 0
+        for i in range(0, self.get_histogram_size()):
+            for j in range(0, self.get_dimension()):
+                pos[j] = self.pointTable[j][i]
+            if write_count % 3 == 0:
+                stream.write('\n')
+            write_count += 1
+            addr = self.address(pos, False)
+            stream.write(f' {self[addr]}')
+        stream.write('\nobject "collective variables scalar field" class field\n')
+
 
 
 class HistogramScalar(HistogramBase):
