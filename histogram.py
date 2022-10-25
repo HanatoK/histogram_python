@@ -391,7 +391,6 @@ class HistogramBase:
         stream.write('\nobject "collective variables scalar field" class field\n')
 
 
-
 class HistogramScalar(HistogramBase):
 
     def __init__(self, ax=None):
@@ -560,6 +559,37 @@ class HistogramVector(HistogramBase):
 
     def __len__(self):
         return len(self.data)
+
+
+class HistogramFiles(HistogramBase):
+
+    # Possible bug: opening too many files
+    def __init__(self, prefix, ax=None):
+        super().__init__(ax)
+        N = self.get_histogram_size()
+        num_digits = len(str(N - 1))
+        self.files = [open(f'{prefix}_{i:0{num_digits}d}.dat', 'w') for i in range(N)]
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        for file in self.files:
+            file.close()
+
+    def __len__(self):
+        return self.get_histogram_size()
+
+    def __getitem__(self, key):
+        try:
+            iter(key)
+            if self.is_in_grid(key):
+                addr = self.address(key, False)
+                return self.files[addr]
+            else:
+                raise IndexError(f'Index {key} is out of bound.')
+        except TypeError:
+            return self.files[key]
+
+    def __setitem__(self, key, value):
+        raise NotImplementedError
 
 
 if __name__ == '__main__':
