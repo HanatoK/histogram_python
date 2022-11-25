@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-import csv
-
-from read_colvars_traj import ReadSpaceSeparatedTraj, ReadColvarsTraj
+from .read_colvars_traj import ReadSpaceSeparatedTraj, ReadColvarsTraj
 
 
 class BuildHistogramFromTraj:
@@ -9,7 +7,7 @@ class BuildHistogramFromTraj:
     def __init__(self, json_file, position_cols):
         import copy
         import logging
-        from histogram import HistogramScalar
+        from .histogram import HistogramScalar
         self.logger = logging.getLogger(self.__class__.__name__)
         logging_handler = logging.StreamHandler()
         logging_formatter = logging.Formatter('[%(name)s %(levelname)s]: %(message)s')
@@ -40,9 +38,10 @@ class BuildHistogramFromTraj:
     def read_pandas(self, df):
         total_lines = 0
         valid_lines = 0
+        np_data = df[self.positionColumns].to_numpy()
         for row in range(0, df.shape[0]):
             total_lines += 1
-            tmp_position = [df.loc[row][key] for key in self.positionColumns]
+            tmp_position = np_data[row]
             if self.histogram.is_in_grid(tmp_position):
                 self.histogram[tmp_position] += 1.0
                 valid_lines += 1
