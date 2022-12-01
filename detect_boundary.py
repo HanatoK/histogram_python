@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from histogram import HistogramScalar
+from .histogram import HistogramScalar
 import argparse
 import numpy as np
 

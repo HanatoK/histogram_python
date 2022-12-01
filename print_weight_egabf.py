@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # from histogram import Axis
-from histogram import HistogramScalar
-from boltzmann_constant import boltzmann_constant_kcalmolk
+from .histogram import HistogramScalar
+from .boltzmann_constant import boltzmann_constant_kcalmolk
 import argparse
-from read_colvars_traj import ReadColvarsTraj
+from .read_colvars_traj import ReadColvarsTraj
 import numpy as np
 import csv
 from scipy.special import logsumexp
