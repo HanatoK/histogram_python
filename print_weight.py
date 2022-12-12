@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # from histogram import Axis
 import math
-from .histogram import HistogramScalar
-from .boltzmann_constant import boltzmann_constant_kcalmolk
+from histogram import HistogramScalar
+from boltzmann_constant import boltzmann_constant_kcalmolk
 import argparse
-from .read_colvars_traj import ReadColvarsTraj
+from read_colvars_traj import ReadColvarsTraj
 import csv
 from scipy.special import logsumexp
 import gzip
