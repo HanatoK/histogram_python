@@ -593,6 +593,12 @@ class HistogramFiles(HistogramBase):
 
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='Histogram test')
+    parser.add_argument('--test1', action='store_true', help='run test1')
+    parser.add_argument('--test2', action='store_true', help='run test2')
+    parser.add_argument('--test3', action='store_true', help='run test3')
+    args = parser.parse_args()
     def test1():
         ax1 = Axis(-180.0, 180.0, 10, True)
         ax2 = Axis(-180.0, 180.0, 10, True)
@@ -628,12 +634,15 @@ if __name__ == '__main__':
         return hist
 
 
-    def test_json():
+    def test3():
         hist = HistogramScalar.from_json_file('test_files/axis_encoded.json')
         from sys import stdout
         hist.write_to_stream(stdout)
 
-    # test1()
-    # test2()
-    test_json()
+    if args.test1 is True:
+        test1()
+    if args.test2 is True:
+        test2()
+    if args.test3 is True:
+        test3()
     pass

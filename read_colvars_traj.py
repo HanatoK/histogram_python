@@ -125,7 +125,12 @@ class ReadColvarsTraj:
 
 
 if __name__ == '__main__':
-    with ReadColvarsTraj('test.colvars.traj') as f_traj:
-        for line in f_traj:
-            if 'E_harmonic1' in line:
-                print(line['E_harmonic1'])
+    import argparse
+    parser = argparse.ArgumentParser(description='Reading a colvars traj file line by line test')
+    parser.add_argument('--test1', action='store_true', help='run test1')
+    args = parser.parse_args()
+    if args.test1 is True:
+        with ReadColvarsTraj('test.colvars.traj') as f_traj:
+            for line in f_traj:
+                if 'E_harmonic1' in line:
+                    print(line['E_harmonic1'])
