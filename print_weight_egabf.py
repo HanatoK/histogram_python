@@ -80,7 +80,7 @@ class GetTrajWeightEGABF:
             else:
                 self.logger.warning(f'position {tmp_positions} is not in the boundary.')
 
-    def parse_traj(self, f_traj, f_output, first_time=False, csv_writer=None):
+    def parse_traj(self, f_traj, f_output, first_time=False, csv_writer=None, dict_output=None):
         factor = self.count * 1.0 / self.weight_sum
         log_const = np.log(self.count) - logsumexp(a=self.log_weights)
         total_lines = 0
@@ -96,6 +96,11 @@ class GetTrajWeightEGABF:
                 csv_writer = csv.DictWriter(f_output, fieldnames=(list(line.keys()) + list(cv_weight.keys())))
             if first_time:
                 csv_writer.writeheader()
+                if isinstance(dict_output, dict):
+                    for key in line.keys():
+                        dict_output[key] = list()
+                    for key in cv_weight.keys():
+                        dict_output[key] = list()
                 first_time = False
             sum_delta_G = 0
             position_in_grid = True
@@ -123,9 +128,14 @@ class GetTrajWeightEGABF:
                 line['log_weight'] = -1.0 * self.max_sum_dG / self.kbt + log_const
                 self.logger.warning(f'position {tmp_positions} is not in the boundary.')
             csv_writer.writerow({**line, **cv_weight})
+            if isinstance(dict_output, dict):
+                for key in line.keys():
+                    dict_output[key].append(line[key])
+                for key in cv_weight.keys():
+                    dict_output[key].append(line[key])
         self.logger.info(f'Total data lines: {total_lines}')
         self.logger.info(f'Valid data lines: {valid_lines}')
-        return first_time, csv_writer
+        return first_time, csv_writer, dict_output
 
 
 if __name__ == '__main__':
@@ -147,4 +157,4 @@ if __name__ == '__main__':
     with gzip.open(args.output, 'wt') as f_output:
         for traj_file in args.traj:
             with ReadColvarsTraj(traj_file) as f_traj:
-                first_time, csv_writer = get_weight_traj.parse_traj(f_traj, f_output, first_time, csv_writer)
+                first_time, csv_writer, _ = get_weight_traj.parse_traj(f_traj, f_output, first_time, csv_writer)

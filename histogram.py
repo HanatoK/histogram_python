@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
+from numba.experimental import jitclass
+from numba import float64, int64, boolean
+from math import fabs, floor
 
+
+spec_axis = [
+    ('lowerBound', float64),
+    ('upperBound', float64),
+    ('periodicUpperBound', float64),
+    ('periodicLowerBound', float64),
+    ('width', float64),
+    ('bins', int64),
+    ('periodic', boolean),
+]
+
+
+@jitclass(spec_axis)
 class Axis:
 
     def __init__(self, lower_bound=0.0, upper_bound=0.0, bins=0, periodic=False):
@@ -13,6 +29,12 @@ class Axis:
             self.width = 0
         self.periodicLowerBound = self.lowerBound
         self.periodicUpperBound = self.upperBound
+
+    def copy(self):
+        obj = Axis(self.lowerBound, self.upperBound, self.bins, self.periodic)
+        obj.periodicUpperBound = self.periodicUpperBound
+        obj.periodicLowerBound = self.periodicLowerBound
+        return obj
 
     def set_periodicity(self, periodic, periodic_lower, periodic_upper):
         self.periodic = periodic
@@ -70,7 +92,6 @@ class Axis:
             return True
 
     def wrap(self, x):
-        from math import fabs, isclose
         if not self.periodic:
             return x
         if (x >= self.periodicLowerBound) and (x <= self.periodicUpperBound):
@@ -80,22 +101,29 @@ class Axis:
             dist_to_lower = self.periodicLowerBound - x
             num_period_add = int(dist_to_lower / periodicity)
             tmp = fabs(dist_to_lower / periodicity - round(dist_to_lower / periodicity))
-            if isclose(tmp, 0.0):
-                x += num_period_add * periodicity
-            else:
+            # if isclose(tmp, 0.0):
+            #     x += num_period_add * periodicity
+            # else:
+            #     x += (num_period_add + 1) * periodicity
+            if fabs(tmp) > 0.0:
                 x += (num_period_add + 1) * periodicity
+            else:
+                x += num_period_add * periodicity
         if x > self.periodicUpperBound:
             dist_to_upper = x - self.periodicUpperBound
             num_period_subtract = int(dist_to_upper / periodicity)
             tmp = fabs(dist_to_upper / periodicity - round(dist_to_upper / periodicity))
-            if isclose(tmp, 0.0):
-                x -= num_period_subtract * periodicity
-            else:
+            # if isclose(tmp, 0.0):
+            #     x -= num_period_subtract * periodicity
+            # else:
+            #     x -= (num_period_subtract + 1) * periodicity
+            if fabs(tmp) > 0.0:
                 x -= (num_period_subtract + 1) * periodicity
+            else:
+                x -= num_period_subtract * periodicity
         return x
 
     def index(self, x, boundary_check=False):
-        from math import floor
         x = self.wrap(x)
         check_result = True
         if boundary_check is True:
@@ -108,7 +136,6 @@ class Axis:
         return idx, check_result
 
     def dist(self, x, reference):
-        from math import fabs
         if not self.periodic:
             return x - reference
         else:
@@ -133,15 +160,30 @@ class Axis:
         result = [self.lowerBound + (i + 0.5) * self.width for i in range(0, self.bins)]
         return result
 
-    def info_header(self):
-        pbc = 0
-        if self.periodic is True:
-            pbc = 1
-        return f'# {self.lowerBound:.9f} {self.width:.9f} {self.bins:d} {pbc}'
+    # def info_header(self):
+    #     pbc = 0
+    #     if self.periodic is True:
+    #         pbc = 1
+    #     return f'# {self.lowerBound:.9f} {self.width:.9f} {self.bins:d} {pbc}'
 
-    def __str__(self) -> str:
-        s = f'boundary: [{self.lowerBound}, {self.upperBound}] ; width: {self.width} ; PBC: {self.periodic}'
-        return s
+    # def __str__(self) -> str:
+    #     s = 'boundary: [{}, {}] ; width: {} ; PBC: {}'.format(
+    #         self.lowerBound, self.upperBound, self.width, self.periodic)
+    #     return s
+
+
+def axis_to_str(ax):
+    s = 'boundary: [{}, {}] ; width: {} ; PBC: {}'.format(
+            ax.lowerBound, ax.upperBound, ax.width, ax.periodic)
+    return s
+
+
+def axis_info_header(ax):
+    pbc = 0
+    if ax.periodic is True:
+        pbc = 1
+    return f'# {ax.lowerBound:.9f} {ax.width:.9f} {ax.bins:d} {pbc}'
+
 
 def create_axis_from_dict(json_dict):
     lb = json_dict['Lower bound']
@@ -202,8 +244,8 @@ class HistogramBase:
     def __str__(self) -> str:
         s = f'histogram size: {self.histogramSize}\n'
         s += f'histogram dimension: {self.ndim}\n'
-        s += f'axes:\n'
-        s += '\n'.join([str(ax) for ax in self.axes])
+        for i, ax in enumerate(self.axes):
+            s += f'axis[{i}]: {axis_to_str(ax)}\n'
         return s
 
     def fill_table(self):
@@ -255,8 +297,7 @@ class HistogramBase:
             ax = Axis(lower_bound=lower_bound, upper_bound=upper_bound,
                       bins=num_bins, periodic=pbc)
             if pbc is True:
-                ax.set_periodicity(periodic=pbc, periodic_lower=lower_bound,
-                                   periodic_upper=upper_bound)
+                ax.set_periodicity(boolean(pbc), float64(lower_bound), float64(upper_bound))
             self.axes.append(ax)
         self._real_init()
         return True
@@ -264,7 +305,7 @@ class HistogramBase:
     def write_to_stream(self, stream):
         stream.write(f'# {self.ndim}\n')
         for ax in self.axes:
-            stream.write(ax.info_header()+'\n')
+            stream.write(axis_info_header(ax)+'\n')
 
     def is_in_grid(self, pos):
         for val, ax in zip(pos, self.axes):
@@ -288,8 +329,8 @@ class HistogramBase:
         for val, ax, ac in zip(pos, self.axes, self.accu):
             i, c = ax.index(val, boundary_check)
             addr += ac * i
-            if c is False and boundary_check is True:
-                self.logger.warning(f'position {pos} is not in boundary!')
+            if boundary_check is True and c is False:
+                raise IndexError(f'position {pos} is not in boundary!')
         return addr
 
     def reverse_address(self, address):
@@ -398,6 +439,30 @@ class HistogramScalar(HistogramBase):
         super().__init__(ax)
         self.data = np.zeros(self.get_histogram_size())
 
+    def __copy__(self):
+        import copy
+        if self.axes is None:
+            return HistogramScalar(None)
+        else:
+            new_axes = []
+            for axis in self.axes:
+                new_axes.append(axis.copy())
+            new_hist = HistogramScalar(new_axes)
+            new_hist.data = copy.copy(self.data)
+            return new_hist
+
+    def __deepcopy__(self, memo):
+        import copy
+        if self.axes is None:
+            return HistogramScalar(None)
+        else:
+            new_axes = []
+            for axis in self.axes:
+                new_axes.append(axis.copy())
+            new_hist = HistogramScalar(new_axes)
+            new_hist.data = copy.deepcopy(self.data, memo)
+            return new_hist
+
     @staticmethod
     def from_json_file(json_file):
         import json
@@ -434,11 +499,11 @@ class HistogramScalar(HistogramBase):
     def __getitem__(self, key):
         try:
             iter(key)
-            if self.is_in_grid(key):
-                addr = self.address(key, False)
+            try:
+                addr = self.address(key, True)
                 return self.data[addr]
-            else:
-                raise IndexError(f'Index {key} is out of bound.')
+            except IndexError as e:
+                raise e
         except TypeError:
             return self.data[key]
 
@@ -484,17 +549,41 @@ class HistogramVector(HistogramBase):
         self.multiplicity = multiplicity
         self.data = np.zeros(self.get_histogram_size() * self.get_multiplicity())
 
+    def __copy__(self):
+        import copy
+        if self.axes is None:
+            return HistogramVector(None, 0)
+        else:
+            new_axes = []
+            for axis in self.axes:
+                new_axes.append(axis.copy())
+            new_hist = HistogramVector(new_axes, self.multiplicity)
+            new_hist.data = copy.copy(self.data)
+            return new_hist
+
+    def __deepcopy__(self, memo):
+        import copy
+        if self.axes is None:
+            return HistogramVector(None, 0)
+        else:
+            new_axes = []
+            for axis in self.axes:
+                new_axes.append(axis.copy())
+            new_hist = HistogramVector(new_axes, self.multiplicity)
+            new_hist.data = copy.deepcopy(self.data, memo)
+            return new_hist
+
     def get_multiplicity(self):
         return self.multiplicity
 
     def __getitem__(self, key):
         try:
             iter(key)
-            if self.is_in_grid(key):
-                addr = self.address(key, False)
+            try:
+                addr = self.address(key, True)
                 return self.data[addr:addr+self.get_multiplicity()]
-            else:
-                raise IndexError(f'Index {key} is out of bound.')
+            except IndexError as e:
+                raise e
         except TypeError:
             return self.data[key]
 
@@ -600,8 +689,8 @@ if __name__ == '__main__':
     parser.add_argument('--test3', action='store_true', help='run test3')
     args = parser.parse_args()
     def test1():
-        ax1 = Axis(-180.0, 180.0, 10, True)
-        ax2 = Axis(-180.0, 180.0, 10, True)
+        ax1 = Axis(-180.0, 180.0, 10, periodic=True)
+        ax2 = ax1.copy()
         hist = HistogramScalar([ax1, ax2])
 
         for x, y in zip(hist.pointTable[0], hist.pointTable[1]):

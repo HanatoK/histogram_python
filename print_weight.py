@@ -8,6 +8,7 @@ from .read_colvars_traj import ReadColvarsTraj
 import csv
 from scipy.special import logsumexp
 import gzip
+import os
 
 
 class GetTrajWeight:
@@ -39,10 +40,12 @@ class GetTrajWeight:
         self.logger.info(f'Get weights from PMF file {pmf_filename}')
         self.logger.info(f'Will read columns: {self.column_names}')
 
-    def accumulate_weights_sum(self, f_traj):
+    def accumulate_weights_sum(self, f_traj, pbar=None):
         total_lines = 0
         valid_lines = 0
         for line in f_traj:
+            if pbar is not None:
+                pbar.update(len(line))
             total_lines = total_lines + 1
             tmp_position = [line[i] for i in self.column_names]
             # check if the position is in boundary
@@ -59,7 +62,7 @@ class GetTrajWeight:
         self.logger.info(f'(Accumulate weights) Valid data lines: {valid_lines}')
         self.logger.info(f'(Accumulate weights) Total weights: {self.weight_sum}')
 
-    def parse_traj(self, f_traj, f_output, first_time=False, csv_writer=None):
+    def parse_traj(self, f_traj, f_output, first_time=False, csv_writer=None, dict_output=None, pbar=None):
         total_lines = 0
         valid_lines = 0
         try:
@@ -71,12 +74,17 @@ class GetTrajWeight:
             self.weight_sum = self.count
         log_const = math.log(self.count) - logsumexp(a=self.log_weights)
         for line in f_traj:
+            if pbar is not None:
+                pbar.update(len(line))
             line['weight'] = 0
             line['log_weight'] = 0
             if csv_writer is None:
                 csv_writer = csv.DictWriter(f_output, fieldnames=line.keys())
             if first_time:
                 csv_writer.writeheader()
+                if isinstance(dict_output, dict):
+                    for key in line.keys():
+                        dict_output[key] = list()
                 first_time = False
             total_lines = total_lines + 1
             tmp_position = [line[i] for i in self.column_names]
@@ -93,28 +101,44 @@ class GetTrajWeight:
                 line['log_weight'] = max(self.log_probability) + log_const
                 self.logger.warning(f'position {tmp_position} is not in the boundary.')
             csv_writer.writerow(line)
+            if isinstance(dict_output, dict):
+                for key in line.keys():
+                    dict_output[key].append(line[key])
         self.logger.info(f'(parse_traj) Total data lines: {total_lines}')
         self.logger.info(f'(parse_traj) Valid data lines: {valid_lines}')
-        return first_time
+        return first_time, csv_writer, dict_output
 
 
-if __name__ == '__main__':
+def main():
+    import tqdm
     parser = argparse.ArgumentParser(description='Print the weights of a Colvars trajectory')
     required_args = parser.add_argument_group('required named arguments')
     required_args.add_argument('--pmf', help='the PMF file', required=True)
-    required_args.add_argument('--traj', nargs='+', help='the Colvars trajectory file', required=True)
+    required_args.add_argument('--traj', nargs='+', help='the Colvars trajectory files', required=True)
     required_args.add_argument('--columns', type=str, nargs='+', help='the columns in the trajectory'
                                                                       ' matching the CVs of the PMF', required=True)
     required_args.add_argument('--output', help='the output file with weights', required=True)
     parser.add_argument('--kbt', default=300.0*boltzmann_constant_kcalmolk, type=float, help='KbT')
     args = parser.parse_args()
+    # print(args.traj)
     # all the arguments are mandatory
     get_weight_traj = GetTrajWeight(args.columns, args.pmf, args.kbt)
     for traj_file in args.traj:
-        with ReadColvarsTraj(traj_file) as f_traj:
-            get_weight_traj.accumulate_weights_sum(f_traj)
+        with tqdm.tqdm(total=os.path.getsize(traj_file), mininterval=1.0) as pbar:
+            pbar.set_description(f'Accumulating weights from file {traj_file}')
+            with ReadColvarsTraj(traj_file) as f_traj:
+                get_weight_traj.accumulate_weights_sum(f_traj, pbar=pbar)
     first_time = True
+    csv_writer = None
     with gzip.open(args.output, 'wt') as f_output:
         for traj_file in args.traj:
-            with ReadColvarsTraj(traj_file) as f_traj:
-                first_time = get_weight_traj.parse_traj(f_traj, f_output, first_time)
+            with tqdm.tqdm(total=os.path.getsize(traj_file), mininterval=1.0) as pbar:
+                pbar.set_description(f'Reweighting file {traj_file}')
+                with ReadColvarsTraj(traj_file) as f_traj:
+                    if csv_writer is not None:
+                        print(f'Append to previous file {args.output}')
+                    first_time, csv_writer, _ = get_weight_traj.parse_traj(f_traj, f_output, first_time, csv_writer, pbar)
+
+
+if __name__ == '__main__':
+    main()
