@@ -45,7 +45,7 @@ class GetTrajWeight:
         valid_lines = 0
         for line in f_traj:
             if pbar is not None:
-                pbar.update(len(line))
+                pbar.update(f_traj.f_traj.tell() - pbar.n)
             total_lines = total_lines + 1
             tmp_position = [line[i] for i in self.column_names]
             # check if the position is in boundary
@@ -75,7 +75,7 @@ class GetTrajWeight:
         log_const = math.log(self.count) - logsumexp(a=self.log_weights)
         for line in f_traj:
             if pbar is not None:
-                pbar.update(len(line))
+                pbar.update(f_traj.f_traj.tell() - pbar.n)
             line['weight'] = 0
             line['log_weight'] = 0
             if csv_writer is None:
@@ -137,7 +137,7 @@ def main():
                 with ReadColvarsTraj(traj_file) as f_traj:
                     if csv_writer is not None:
                         print(f'Append to previous file {args.output}')
-                    first_time, csv_writer, _ = get_weight_traj.parse_traj(f_traj, f_output, first_time, csv_writer, pbar)
+                    first_time, csv_writer, _ = get_weight_traj.parse_traj(f_traj, f_output, first_time, csv_writer, pbar=pbar)
 
 
 if __name__ == '__main__':
