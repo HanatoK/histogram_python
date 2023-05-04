@@ -209,6 +209,8 @@ class HistogramBase:
     def __init__(self, ax=None):
         import logging
         self.logger = logging.getLogger(self.__class__.__name__)
+        if self.logger.hasHandlers():
+            self.logger.handlers.clear()
         logging_handler = logging.StreamHandler()
         logging_formatter = logging.Formatter('[%(name)s %(levelname)s]: %(message)s')
         logging_handler.setFormatter(logging_formatter)
